@@ -1,4 +1,4 @@
-import { Setting } from 'obsidian'
+import { Setting, Notice, TextComponent } from 'obsidian'
 import { normalizeGateOption } from './normalizeGateOption'
 import { GateFrameOption, GateFrameOptionType } from '../GateOptions'
 
@@ -86,11 +86,13 @@ export const createFormEditGate = (contentEl: HTMLElement, gateOptions: GateFram
             })
         )
 
+    let profileKeyText: TextComponent
     new Setting(advancedOptions)
         .setName('Profile Key')
         .setClass('open-gate--form-field')
-        .setDesc("It's like profiles in Chrome, gates with the same profile can share storage")
-        .addText((text) =>
+        .setDesc("Like Chrome profiles; gates with the same profile share storage. 💡 Click the link button to reuse Obsidian Web Viewer's session (e.g. share a logged-in Google account).")
+        .addText((text) => {
+            profileKeyText = text
             text.setValue(gateOptions.profileKey ?? '').onChange(async (value) => {
                 if (value === '') {
                     value = 'open-gate'
@@ -98,6 +100,26 @@ export const createFormEditGate = (contentEl: HTMLElement, gateOptions: GateFram
 
                 gateOptions.profileKey = value
             })
+        })
+        .addExtraButton((btn) =>
+            btn
+                .setIcon('link')
+                .setTooltip("Use Obsidian Web Viewer's session (share its logins)")
+                .onClick(() => {
+                    // Obsidian's core Web Viewer uses a "persist:vault-..." partition.
+                    // Reusing it lets a gate inherit logins (e.g. Google) that the
+                    // gate's own webview is otherwise blocked from performing.
+                    const wv = document.querySelector('webview[partition^="persist:vault-"]')
+                    const partition = wv?.getAttribute('partition') ?? ''
+                    if (partition.startsWith('persist:')) {
+                        const key = partition.slice('persist:'.length)
+                        profileKeyText.setValue(key)
+                        gateOptions.profileKey = key
+                        new Notice('Web Viewer session applied: ' + key)
+                    } else {
+                        new Notice('Open the Web Viewer first (a logged-in tab), then try again.')
+                    }
+                })
         )
 
     //zoomFactor
